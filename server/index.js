@@ -200,6 +200,42 @@ app.post('/api/messages/:id/reply', (req, res) => {
   res.json(db.messages[idx]);
 });
 
+// Simple CAPTCHA endpoints (server-side challenge store)
+const captchaStore = new Map();
+function cleanupCaptchas() {
+  const now = Date.now();
+  for (const [k, v] of captchaStore.entries()) {
+    if (v.expires < now) captchaStore.delete(k);
+  }
+}
+setInterval(cleanupCaptchas, 60 * 1000);
+
+app.get('/api/captcha', (req, res) => {
+  // generate a math question
+  const ops = ['+', '-', '*'];
+  const a = Math.floor(Math.random() * 9) + 1;
+  const b = Math.floor(Math.random() * 9) + 1;
+  const op = ops[Math.floor(Math.random() * ops.length)];
+  let answer = 0;
+  if (op === '+') answer = a + b;
+  if (op === '-') answer = a - b;
+  if (op === '*') answer = a * b;
+  const id = uuidv4();
+  captchaStore.set(id, { answer: String(answer), expires: Date.now() + 5 * 60 * 1000 });
+  res.json({ id, question: `${a} ${op} ${b}` });
+});
+
+app.post('/api/captcha/verify', (req, res) => {
+  const { id, answer } = req.body || {};
+  if (!id) return res.status(400).json({ ok: false, error: 'id required' });
+  const entry = captchaStore.get(id);
+  if (!entry) return res.json({ ok: false, error: 'not found or expired' });
+  const ok = String(answer || '').trim() === String(entry.answer).trim();
+  // consume captcha
+  captchaStore.delete(id);
+  res.json({ ok });
+});
+
 app.post('/api/auth/signup', (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) return res.status(400).json({ error: 'username and password required' });

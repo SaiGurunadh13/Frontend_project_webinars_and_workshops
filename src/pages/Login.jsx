@@ -68,20 +68,43 @@ function ForgotPassword({ onDone }) {
   const [username, setUsername] = useState('');
   const [newPass, setNewPass] = useState('');
   const [msg, setMsg] = useState('');
-  const [captchaA, setCaptchaA] = useState(() => Math.floor(Math.random() * 9) + 1);
-  const [captchaB, setCaptchaB] = useState(() => Math.floor(Math.random() * 9) + 1);
+  const [captcha, setCaptcha] = useState(null);
   const [captchaInput, setCaptchaInput] = useState('');
 
   function handleReset(e) {
     e.preventDefault();
-    const expected = (captchaA + captchaB).toString();
-    if ((captchaInput || '').trim() !== expected) {
-      setMsg('Captcha answer is incorrect. Please try again.');
-      setCaptchaA(Math.floor(Math.random() * 9) + 1);
-      setCaptchaB(Math.floor(Math.random() * 9) + 1);
-      setCaptchaInput('');
-      return;
-    }
+    (async () => {
+      if (!captcha) {
+        setMsg('Please solve the captcha');
+        return;
+      }
+      const res = await verifyCaptcha(captcha.id, captchaInput);
+      if (!res || !res.ok) {
+        setMsg('Captcha answer is incorrect. Please try again.');
+        const next = await getCaptcha();
+        setCaptcha(next);
+        setCaptchaInput('');
+        return;
+      }
+
+      const raw = localStorage.getItem('users');
+      const users = raw ? JSON.parse(raw) : [];
+      const idx = users.findIndex((u) => u.username === username);
+      if (idx === -1) {
+        setMsg('User not found.');
+        return;
+      }
+      if (!newPass) {
+        setMsg('Please enter a new password.');
+        return;
+      }
+      users[idx].password = newPass;
+      localStorage.setItem('users', JSON.stringify(users));
+      setMsg('Password updated. You can now login.');
+      setTimeout(() => {
+        onDone && onDone();
+      }, 900);
+    })();
     const raw = localStorage.getItem('users');
     const users = raw ? JSON.parse(raw) : [];
     const idx = users.findIndex((u) => u.username === username);
@@ -108,9 +131,9 @@ function ForgotPassword({ onDone }) {
         <input className="input" placeholder="Username" value={username} onChange={(e) => setUsername(e.target.value)} />
         <input className="input" placeholder="New password" type="password" value={newPass} onChange={(e) => setNewPass(e.target.value)} />
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <div className="muted" style={{ minWidth: 140 }}>What is {captchaA} + {captchaB}?</div>
+          <div className="muted" style={{ minWidth: 140 }}>{captcha ? `Solve: ${captcha.question}` : 'Loading captcha...'}</div>
           <input className="input" style={{ width: 120 }} value={captchaInput} onChange={(e) => setCaptchaInput(e.target.value)} placeholder="Answer" />
-          <button type="button" className="btn" onClick={() => { setCaptchaA(Math.floor(Math.random()*9)+1); setCaptchaB(Math.floor(Math.random()*9)+1); setCaptchaInput(''); }}>New</button>
+          <button type="button" className="btn" onClick={async () => { const c = await getCaptcha(); setCaptcha(c); setCaptchaInput(''); }}>New</button>
         </div>
         <button className="btn primary" type="submit">Set new password</button>
         {msg && <div className="muted">{msg}</div>}

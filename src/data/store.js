@@ -151,6 +151,49 @@ export async function addMessage(msg) {
   }
 }
 
+// CAPTCHA helpers: get a challenge (API or local) and verify
+export async function getCaptcha() {
+  const API_BASE = import.meta.env.VITE_API_URL || '';
+  if (API_BASE) {
+    try {
+      const res = await fetch(`${API_BASE}/api/captcha`);
+      if (res.ok) return await res.json();
+    } catch (e) {
+      // fallback to local
+    }
+  }
+  // local fallback
+  const ops = ['+', '-', '*'];
+  const a = Math.floor(Math.random() * 9) + 1;
+  const b = Math.floor(Math.random() * 9) + 1;
+  const op = ops[Math.floor(Math.random() * ops.length)];
+  let answer = 0;
+  if (op === '+') answer = a + b;
+  if (op === '-') answer = a - b;
+  if (op === '*') answer = a * b;
+  const id = Date.now().toString() + Math.floor(Math.random() * 10000).toString();
+  sessionStorage.setItem(`captcha:${id}`, String(answer));
+  return { id, question: `${a} ${op} ${b}` };
+}
+
+export async function verifyCaptcha(id, answer) {
+  const API_BASE = import.meta.env.VITE_API_URL || '';
+  if (API_BASE) {
+    try {
+      const res = await fetch(`${API_BASE}/api/captcha/verify`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, answer })
+      });
+      if (res.ok) return await res.json();
+    } catch (e) {
+      // fallthrough to local
+    }
+  }
+  const expected = sessionStorage.getItem(`captcha:${id}`);
+  // consume
+  sessionStorage.removeItem(`captcha:${id}`);
+  return { ok: String(answer || '').trim() === String(expected || '').trim() };
+}
+
 export async function replyMessage(id, reply) {
   try {
     const API_BASE = import.meta.env.VITE_API_URL || '';

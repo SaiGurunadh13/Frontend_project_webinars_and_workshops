@@ -1,12 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { getCaptcha, verifyCaptcha } from '../data/store';
 
 export default function Signup() {
   const [user, setUser] = useState('');
   const [pass, setPass] = useState('');
   const [error, setError] = useState('');
-  const [captchaA, setCaptchaA] = useState(() => Math.floor(Math.random() * 9) + 1);
-  const [captchaB, setCaptchaB] = useState(() => Math.floor(Math.random() * 9) + 1);
+  const [captcha, setCaptcha] = useState(null);
   const [captchaInput, setCaptchaInput] = useState('');
   const navigate = useNavigate();
 
@@ -16,29 +16,44 @@ export default function Signup() {
       setError('Please provide username and password');
       return;
     }
-    const expected = (captchaA + captchaB).toString();
-    if ((captchaInput || '').trim() !== expected) {
-      setError('Captcha answer is incorrect. Please try again.');
-      // regenerate
-      setCaptchaA(Math.floor(Math.random() * 9) + 1);
-      setCaptchaB(Math.floor(Math.random() * 9) + 1);
-      setCaptchaInput('');
-      return;
-    }
-    const raw = localStorage.getItem('users');
-    const users = raw ? JSON.parse(raw) : [];
-    if (users.find((u) => u.username === user)) {
-      setError('Username already exists');
-      return;
-    }
-    users.push({ username: user, password: pass });
-    localStorage.setItem('users', JSON.stringify(users));
-    // set role and navigate as student
-    localStorage.setItem('role', 'student');
-    localStorage.setItem('currentUser', user);
-    window.dispatchEvent(new Event('roleChanged'));
-    navigate('/webinars');
+    (async () => {
+      if (!captcha) {
+        setError('Please solve the captcha');
+        return;
+      }
+      const res = await verifyCaptcha(captcha.id, captchaInput);
+      if (!res || !res.ok) {
+        setError('Captcha answer is incorrect. Please try again.');
+        // refresh
+        const next = await getCaptcha();
+        setCaptcha(next);
+        setCaptchaInput('');
+        return;
+      }
+
+      // proceed with signup
+      const raw = localStorage.getItem('users');
+      const users = raw ? JSON.parse(raw) : [];
+      if (users.find((u) => u.username === user)) {
+        setError('Username already exists');
+        return;
+      }
+      users.push({ username: user, password: pass });
+      localStorage.setItem('users', JSON.stringify(users));
+      // set role and navigate as student
+      localStorage.setItem('role', 'student');
+      localStorage.setItem('currentUser', user);
+      window.dispatchEvent(new Event('roleChanged'));
+      navigate('/webinars');
+    })();
   }
+
+  useEffect(() => {
+    (async () => {
+      const c = await getCaptcha();
+      setCaptcha(c);
+    })();
+  }, []);
 
   return (
     <section style={{ padding: 40 }}>
@@ -48,9 +63,9 @@ export default function Signup() {
           <input className="input" placeholder="Username" value={user} onChange={(e) => setUser(e.target.value)} />
           <input className="input" type="password" placeholder="Password" value={pass} onChange={(e) => setPass(e.target.value)} />
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <div style={{ minWidth: 140 }} className="muted">What is {captchaA} + {captchaB}?</div>
+            <div style={{ minWidth: 220 }} className="muted">{captcha ? `Solve: ${captcha.question}` : 'Loading captcha...'}</div>
             <input className="input" style={{ width: 120 }} name="captcha" value={captchaInput} onChange={(e) => setCaptchaInput(e.target.value)} placeholder="Answer" />
-            <button type="button" className="btn" onClick={() => { setCaptchaA(Math.floor(Math.random()*9)+1); setCaptchaB(Math.floor(Math.random()*9)+1); setCaptchaInput(''); }}>New</button>
+            <button type="button" className="btn" onClick={async () => { const c = await getCaptcha(); setCaptcha(c); setCaptchaInput(''); }}>New</button>
           </div>
           <button className="btn primary" type="submit">Create account</button>
           {error && <div className="muted">{error}</div>}
