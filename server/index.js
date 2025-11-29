@@ -4,10 +4,41 @@ import path from 'path';
 import cors from 'cors';
 import bodyParser from 'body-parser';
 import { v4 as uuidv4 } from 'uuid';
+import { MongoClient } from 'mongodb';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
 const DB_PATH = path.join(process.cwd(), 'server', 'data', 'db.json');
+const MONGO_URI = process.env.MONGO_URI || '';
+const MONGO_DB = process.env.MONGO_DB || 'webinar_db';
+
+let mongoClient = null;
+let mongoDB = null;
+let useMongo = false;
+
+async function initMongo() {
+  if (!MONGO_URI) return;
+  try {
+    mongoClient = new MongoClient(MONGO_URI);
+    await mongoClient.connect();
+    mongoDB = mongoClient.db(MONGO_DB);
+    useMongo = true;
+    console.log('Connected to MongoDB', MONGO_URI, 'db:', MONGO_DB);
+    await Promise.all([
+      mongoDB.createCollection('users').catch(()=>{}),
+      mongoDB.createCollection('webinars').catch(()=>{}),
+      mongoDB.createCollection('registrations').catch(()=>{}),
+      mongoDB.createCollection('messages').catch(()=>{}),
+      mongoDB.createCollection('loginLogs').catch(()=>{})
+    ]);
+    try { await mongoDB.collection('users').createIndex({ username: 1 }, { unique: true }); } catch(e){}
+  } catch (e) {
+    console.error('Failed to init MongoDB', e);
+    useMongo = false;
+  }
+}
+
+initMongo();
 
 app.use(cors());
 app.use(bodyParser.json());
@@ -59,6 +90,12 @@ app.delete('/api/webinars/:id', (req, res) => {
 
 // Users & Auth
 app.get('/api/users', (req, res) => {
+  if (useMongo) {
+    mongoDB.collection('users').find({}, { projection: { password: 1, username: 1, id: 1 } }).toArray()
+      .then(list => res.json(list || []))
+      .catch(err => res.status(500).json({ error: err.message }));
+    return;
+  }
   const db = readDB();
   res.json(db.users);
 });
@@ -70,6 +107,13 @@ app.get('/api/registrations', (req, res) => {
 });
 
 app.post('/api/registrations', (req, res) => {
+  if (useMongo) {
+    const item = { id: uuidv4(), timestamp: new Date().toISOString(), ...req.body };
+    mongoDB.collection('registrations').insertOne(item)
+      .then(r => res.status(201).json(item))
+      .catch(err => res.status(500).json({ error: err.message }));
+    return;
+  }
   const db = readDB();
   const item = { id: uuidv4(), timestamp: new Date().toISOString(), ...req.body };
   db.registrations = db.registrations || [];
@@ -79,6 +123,15 @@ app.post('/api/registrations', (req, res) => {
 });
 
 app.delete('/api/registrations/:id', (req, res) => {
+  if (useMongo) {
+    mongoDB.collection('registrations').findOneAndDelete({ id: req.params.id })
+      .then(result => {
+        if (!result.value) return res.status(404).json({ error: 'Not found' });
+        res.json(result.value);
+      })
+      .catch(err => res.status(500).json({ error: err.message }));
+    return;
+  }
   const db = readDB();
   db.registrations = db.registrations || [];
   const idx = db.registrations.findIndex(r => r.id === req.params.id);
@@ -90,11 +143,24 @@ app.delete('/api/registrations/:id', (req, res) => {
 
 // Messages
 app.get('/api/messages', (req, res) => {
+  if (useMongo) {
+    mongoDB.collection('messages').find({}).toArray()
+      .then(list => res.json(list || []))
+      .catch(err => res.status(500).json({ error: err.message }));
+    return;
+  }
   const db = readDB();
   res.json(db.messages || []);
 });
 
 app.post('/api/messages', (req, res) => {
+  if (useMongo) {
+    const item = { id: uuidv4(), timestamp: new Date().toISOString(), ...req.body };
+    mongoDB.collection('messages').insertOne(item)
+      .then(r => res.status(201).json(item))
+      .catch(err => res.status(500).json({ error: err.message }));
+    return;
+  }
   const db = readDB();
   const item = { id: uuidv4(), timestamp: new Date().toISOString(), ...req.body };
   db.messages = db.messages || [];
@@ -104,6 +170,15 @@ app.post('/api/messages', (req, res) => {
 });
 
 app.delete('/api/messages/:id', (req, res) => {
+  if (useMongo) {
+    mongoDB.collection('messages').findOneAndDelete({ id: req.params.id })
+      .then(result => {
+        if (!result.value) return res.status(404).json({ error: 'Not found' });
+        res.json(result.value);
+      })
+      .catch(err => res.status(500).json({ error: err.message }));
+    return;
+  }
   const db = readDB();
   db.messages = db.messages || [];
   const idx = db.messages.findIndex(m => m.id === req.params.id);
@@ -128,6 +203,16 @@ app.post('/api/messages/:id/reply', (req, res) => {
 app.post('/api/auth/signup', (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) return res.status(400).json({ error: 'username and password required' });
+  if (useMongo) {
+    const usersCol = mongoDB.collection('users');
+    usersCol.findOne({ username }).then(found => {
+      if (found) return res.status(409).json({ error: 'User exists' });
+      const user = { id: uuidv4(), username, password };
+      usersCol.insertOne(user).then(() => res.status(201).json({ ok: true, user: { id: user.id, username: user.username } }))
+        .catch(err => res.status(500).json({ error: err.message }));
+    }).catch(err => res.status(500).json({ error: err.message }));
+    return;
+  }
   const db = readDB();
   if (db.users.find(u => u.username === username)) return res.status(409).json({ error: 'User exists' });
   const user = { id: uuidv4(), username, password };
@@ -137,6 +222,15 @@ app.post('/api/auth/signup', (req, res) => {
 });
 
 app.delete('/api/users/:username', (req, res) => {
+  if (useMongo) {
+    mongoDB.collection('users').findOneAndDelete({ username: req.params.username })
+      .then(result => {
+        if (!result.value) return res.status(404).json({ error: 'Not found' });
+        res.json(result.value);
+      })
+      .catch(err => res.status(500).json({ error: err.message }));
+    return;
+  }
   const db = readDB();
   db.users = db.users || [];
   const idx = db.users.findIndex(u => u.username === req.params.username);
@@ -152,13 +246,42 @@ app.post('/api/auth/login', (req, res) => {
 
   // admin shortcut
   if (username === 'admin' && password === 'admin') {
+    // log admin login
+    if (useMongo) {
+      mongoDB.collection('loginLogs').insertOne({ id: uuidv4(), username, success: true, timestamp: new Date().toISOString(), ip: req.ip }).catch(()=>{});
+    }
     return res.json({ ok: true, role: 'admin' });
   }
-
+  if (useMongo) {
+    mongoDB.collection('users').findOne({ username, password }).then(found => {
+      const log = { id: uuidv4(), username, success: !!found, timestamp: new Date().toISOString(), ip: req.ip };
+      mongoDB.collection('loginLogs').insertOne(log).catch(()=>{});
+      if (!found) return res.status(401).json({ error: 'Invalid credentials' });
+      return res.json({ ok: true, role: 'student', user: { id: found.id, username: found.username } });
+    }).catch(err => res.status(500).json({ error: err.message }));
+    return;
+  }
   const db = readDB();
   const found = db.users.find(u => u.username === username && u.password === password);
+  // log attempt
+  const logs = db.loginLogs || [];
+  logs.unshift({ id: uuidv4(), username, success: !!found, timestamp: new Date().toISOString(), ip: req.ip });
+  db.loginLogs = logs;
+  writeDB(db);
   if (!found) return res.status(401).json({ error: 'Invalid credentials' });
   res.json({ ok: true, role: 'student', user: { id: found.id, username: found.username } });
+});
+
+// Get login logs
+app.get('/api/login-logs', (req, res) => {
+  if (useMongo) {
+    mongoDB.collection('loginLogs').find({}).sort({ timestamp: -1 }).toArray()
+      .then(list => res.json(list || []))
+      .catch(err => res.status(500).json({ error: err.message }));
+    return;
+  }
+  const db = readDB();
+  res.json(db.loginLogs || []);
 });
 
 app.post('/api/auth/forgot', (req, res) => {
