@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
-import preview from "../assets/react.svg";
 import { loadWebinars } from "../data/store";
 import WebinarCard from "../components/WebinarCard";
 import Modal from "../components/Modal";
@@ -116,7 +115,7 @@ export default function Home() {
         </div>
 
         <div className="card" style={{ padding: 18 }}>
-          <img alt="webinar preview" src={preview} style={{ borderRadius: 14 }} />
+          <div style={{ borderRadius: 14, height: 180, background: 'linear-gradient(135deg,#f5f7fb,#eef2ff)' }} />
         </div>
       </section>
 
@@ -140,7 +139,7 @@ export default function Home() {
               </div>
             </div>
             <div style={{ width: 220 }}>
-              <img alt="featured" src={preview} />
+              <div style={{ width: '100%', height: 140, borderRadius: 8, background: 'linear-gradient(135deg,#f5f7fb,#eef2ff)' }} />
             </div>
           </div>
         ) : (

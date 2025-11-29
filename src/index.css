@@ -221,6 +221,30 @@ select:focus {
   box-shadow: var(--ring);
   border-color: var(--brand);
 }
+
+/* Form helpers to keep inputs and captcha responsive */
+form {
+  width: 100%;
+}
+.captcha-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.captcha-row .captcha-image {
+  height: 56px;
+  min-width: 120px;
+  border-radius: 6px;
+  border: 1px solid rgba(0,0,0,0.06);
+  object-fit: contain;
+}
+.captcha-row .input {
+  flex: 1 1 160px;
+  min-width: 120px;
+  width: auto;
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(3,1fr);
