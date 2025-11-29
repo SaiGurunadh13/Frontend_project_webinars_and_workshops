@@ -1,16 +1,40 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import Modal from '../components/Modal';
+import { getCaptcha, verifyCaptcha } from '../data/store';
 
 export default function Login() {
   const [user, setUser] = useState('');
   const [pass, setPass] = useState('');
   const [error, setError] = useState('');
+  const [captcha, setCaptcha] = useState(null);
+  const [captchaInput, setCaptchaInput] = useState('');
   const [modal, setModal] = useState(null);
   const navigate = useNavigate();
 
-  function handleSubmit(e) {
+  useEffect(() => {
+    (async () => {
+      const c = await getCaptcha();
+      setCaptcha(c);
+    })();
+  }, []);
+
+  async function handleSubmit(e) {
     e.preventDefault();
+    setError('');
+    if (!captcha) {
+      setError('Please solve the captcha');
+      return;
+    }
+    const ok = await verifyCaptcha(captcha.id, captchaInput);
+    if (!ok || !ok.ok) {
+      setError('Captcha answer is incorrect. Please try again.');
+      const next = await getCaptcha();
+      setCaptcha(next);
+      setCaptchaInput('');
+      return;
+    }
+
     // admin login
     if (user === 'admin' && pass === 'admin') {
       localStorage.setItem('role', 'admin');
@@ -51,6 +75,17 @@ export default function Login() {
         <form onSubmit={handleSubmit} style={{ display: 'grid', gap: 10 }}>
           <input className="input" placeholder="Username" value={user} onChange={(e) => setUser(e.target.value)} />
           <input className="input" type="password" placeholder="Password" value={pass} onChange={(e) => setPass(e.target.value)} />
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <div style={{ minWidth: 220 }}>
+              {captcha ? (
+                <img src={captcha.image} alt="captcha" style={{ height: 56, borderRadius: 6, border: '1px solid rgba(0,0,0,0.06)' }} />
+              ) : (
+                <div className="muted">Loading captcha...</div>
+              )}
+            </div>
+            <input className="input" style={{ width: 160 }} value={captchaInput} onChange={(e) => setCaptchaInput(e.target.value)} placeholder="Enter characters" />
+            <button type="button" className="btn" onClick={async () => { const c = await getCaptcha(); setCaptcha(c); setCaptchaInput(''); }}>Refresh</button>
+          </div>
           <button className="btn primary" type="submit">Sign in</button>
           {error && <div className="muted">{error}</div>}
         </form>
@@ -64,47 +99,34 @@ export default function Login() {
   );
 }
 
-function ForgotPassword({ onDone }) {
+  function ForgotPassword({ onDone }) {
   const [username, setUsername] = useState('');
   const [newPass, setNewPass] = useState('');
   const [msg, setMsg] = useState('');
   const [captcha, setCaptcha] = useState(null);
   const [captchaInput, setCaptchaInput] = useState('');
 
-  function handleReset(e) {
-    e.preventDefault();
+  useEffect(() => {
     (async () => {
-      if (!captcha) {
-        setMsg('Please solve the captcha');
-        return;
-      }
-      const res = await verifyCaptcha(captcha.id, captchaInput);
-      if (!res || !res.ok) {
-        setMsg('Captcha answer is incorrect. Please try again.');
-        const next = await getCaptcha();
-        setCaptcha(next);
-        setCaptchaInput('');
-        return;
-      }
-
-      const raw = localStorage.getItem('users');
-      const users = raw ? JSON.parse(raw) : [];
-      const idx = users.findIndex((u) => u.username === username);
-      if (idx === -1) {
-        setMsg('User not found.');
-        return;
-      }
-      if (!newPass) {
-        setMsg('Please enter a new password.');
-        return;
-      }
-      users[idx].password = newPass;
-      localStorage.setItem('users', JSON.stringify(users));
-      setMsg('Password updated. You can now login.');
-      setTimeout(() => {
-        onDone && onDone();
-      }, 900);
+      const c = await getCaptcha();
+      setCaptcha(c);
     })();
+  }, []);
+
+  async function handleReset(e) {
+    e.preventDefault();
+    if (!captcha) {
+      setMsg('Please solve the captcha');
+      return;
+    }
+    const res = await verifyCaptcha(captcha.id, captchaInput);
+    if (!res || !res.ok) {
+      setMsg('Captcha answer is incorrect. Please try again.');
+      const next = await getCaptcha();
+      setCaptcha(next);
+      setCaptchaInput('');
+      return;
+    }
     const raw = localStorage.getItem('users');
     const users = raw ? JSON.parse(raw) : [];
     const idx = users.findIndex((u) => u.username === username);

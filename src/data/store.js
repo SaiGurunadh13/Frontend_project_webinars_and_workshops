@@ -163,17 +163,16 @@ export async function getCaptcha() {
     }
   }
   // local fallback
-  const ops = ['+', '-', '*'];
-  const a = Math.floor(Math.random() * 9) + 1;
-  const b = Math.floor(Math.random() * 9) + 1;
-  const op = ops[Math.floor(Math.random() * ops.length)];
-  let answer = 0;
-  if (op === '+') answer = a + b;
-  if (op === '-') answer = a - b;
-  if (op === '*') answer = a * b;
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let txt = '';
+  for (let i = 0; i < 6; i++) txt += chars.charAt(Math.floor(Math.random() * chars.length));
   const id = Date.now().toString() + Math.floor(Math.random() * 10000).toString();
-  sessionStorage.setItem(`captcha:${id}`, String(answer));
-  return { id, question: `${a} ${op} ${b}` };
+  sessionStorage.setItem(`captcha:${id}`, String(txt));
+  // create simple SVG data URL for local fallback
+  const svg = `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns='http://www.w3.org/2000/svg' width='200' height='70'>\n  <rect width='100%' height='100%' fill='#f6f7fb'/>\n  <g font-family='Tahoma, Arial' font-size='34' font-weight='700' fill='#222'>\n    <text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' transform='rotate(${(Math.random()*10)-5} 100 35)'>${txt}</text>\n  </g>\n  <g stroke='#c8cde8' stroke-width='1'>\n    <line x1='0' y1='10' x2='200' y2='10' opacity='0.3'/>\n    <line x1='0' y1='60' x2='200' y2='60' opacity='0.2'/>\n  </g>\n</svg>`;
+  const b64 = btoa(unescape(encodeURIComponent(svg)));
+  const dataUrl = `data:image/svg+xml;base64,${b64}`;
+  return { id, image: dataUrl };
 }
 
 export async function verifyCaptcha(id, answer) {
@@ -191,7 +190,7 @@ export async function verifyCaptcha(id, answer) {
   const expected = sessionStorage.getItem(`captcha:${id}`);
   // consume
   sessionStorage.removeItem(`captcha:${id}`);
-  return { ok: String(answer || '').trim() === String(expected || '').trim() };
+  return { ok: String(answer || '').trim().toUpperCase() === String(expected || '').trim().toUpperCase() };
 }
 
 export async function replyMessage(id, reply) {

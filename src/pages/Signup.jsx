@@ -63,9 +63,15 @@ export default function Signup() {
           <input className="input" placeholder="Username" value={user} onChange={(e) => setUser(e.target.value)} />
           <input className="input" type="password" placeholder="Password" value={pass} onChange={(e) => setPass(e.target.value)} />
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <div style={{ minWidth: 220 }} className="muted">{captcha ? `Solve: ${captcha.question}` : 'Loading captcha...'}</div>
-            <input className="input" style={{ width: 120 }} name="captcha" value={captchaInput} onChange={(e) => setCaptchaInput(e.target.value)} placeholder="Answer" />
-            <button type="button" className="btn" onClick={async () => { const c = await getCaptcha(); setCaptcha(c); setCaptchaInput(''); }}>New</button>
+            <div style={{ minWidth: 220 }}>
+              {captcha ? (
+                <img src={captcha.image} alt="captcha" style={{ height: 56, borderRadius: 6, border: '1px solid rgba(0,0,0,0.06)' }} />
+              ) : (
+                <div className="muted">Loading captcha...</div>
+              )}
+            </div>
+            <input className="input" style={{ width: 160 }} name="captcha" value={captchaInput} onChange={(e) => setCaptchaInput(e.target.value)} placeholder="Enter characters" />
+            <button type="button" className="btn" onClick={async () => { const c = await getCaptcha(); setCaptcha(c); setCaptchaInput(''); }}>Refresh</button>
           </div>
           <button className="btn primary" type="submit">Create account</button>
           {error && <div className="muted">{error}</div>}

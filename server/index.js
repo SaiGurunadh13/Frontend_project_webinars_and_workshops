@@ -211,18 +211,17 @@ function cleanupCaptchas() {
 setInterval(cleanupCaptchas, 60 * 1000);
 
 app.get('/api/captcha', (req, res) => {
-  // generate a math question
-  const ops = ['+', '-', '*'];
-  const a = Math.floor(Math.random() * 9) + 1;
-  const b = Math.floor(Math.random() * 9) + 1;
-  const op = ops[Math.floor(Math.random() * ops.length)];
-  let answer = 0;
-  if (op === '+') answer = a + b;
-  if (op === '-') answer = a - b;
-  if (op === '*') answer = a * b;
+  // generate a random alphanumeric captcha and return an SVG image data URL
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // avoid confusing chars
+  let txt = '';
+  for (let i = 0; i < 6; i++) txt += chars.charAt(Math.floor(Math.random() * chars.length));
   const id = uuidv4();
-  captchaStore.set(id, { answer: String(answer), expires: Date.now() + 5 * 60 * 1000 });
-  res.json({ id, question: `${a} ${op} ${b}` });
+  captchaStore.set(id, { answer: String(txt), expires: Date.now() + 5 * 60 * 1000 });
+  // create simple SVG with some noise lines
+  const svg = `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns='http://www.w3.org/2000/svg' width='200' height='70'>\n  <rect width='100%' height='100%' fill='#f6f7fb'/>\n  <g font-family='Tahoma, Arial' font-size='34' font-weight='700' fill='#222'>\n    <text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' transform='rotate(${(Math.random()*10)-5} 100 35)'>${txt}</text>\n  </g>\n  <g stroke='#c8cde8' stroke-width='1'>\n    <line x1='0' y1='10' x2='200' y2='10' opacity='0.3'/>\n    <line x1='0' y1='60' x2='200' y2='60' opacity='0.2'/>\n  </g>\n</svg>`;
+  const b64 = Buffer.from(svg).toString('base64');
+  const dataUrl = `data:image/svg+xml;base64,${b64}`;
+  res.json({ id, image: dataUrl });
 });
 
 app.post('/api/captcha/verify', (req, res) => {
