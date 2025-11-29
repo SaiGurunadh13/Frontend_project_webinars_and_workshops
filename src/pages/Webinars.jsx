@@ -1,19 +1,30 @@
-import React, { useState } from "react";
-import webinars from "../data/webinars";
+import React, { useEffect, useState } from "react";
+import { loadWebinars } from "../data/store";
 import WebinarCard from "../components/WebinarCard";
 import Modal from "../components/Modal";
 
-function RegisterForm() {
+import { addRegistration } from '../data/store';
+
+function RegisterForm({ webinarId }) {
   const [msg, setMsg] = useState("");
-  function handleSubmit(e) {
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+
+  async function handleSubmit(e) {
     e.preventDefault();
-    setMsg("Thanks for registering! Check your email for details.");
-    e.target.reset();
+    const currentUser = localStorage.getItem('currentUser') || name;
+    const reg = await addRegistration({ webinarId, username: currentUser, name, email });
+    if (reg) {
+      setMsg("Thanks for registering! Check your email for details.");
+      e.target.reset();
+    } else {
+      setMsg('Failed to register. Please try again.');
+    }
   }
   return (
     <form style={{ display: "grid", gap: 10 }} onSubmit={handleSubmit}>
-      <input className="input" name="name" placeholder="Your Name" required />
-      <input className="input" name="email" type="email" placeholder="Email" required />
+      <input className="input" name="name" placeholder="Your Name" value={name} onChange={(e)=>setName(e.target.value)} required />
+      <input className="input" name="email" type="email" placeholder="Email" value={email} onChange={(e)=>setEmail(e.target.value)} required />
       <button className="btn primary" type="submit">Submit</button>
       {msg && <div className="muted" style={{ display: "block" }}>{msg}</div>}
     </form>
@@ -24,6 +35,13 @@ export default function Webinars() {
   const [search, setSearch] = useState("");
   const [tag, setTag] = useState("");
   const [modal, setModal] = useState(null);
+  const [webinars, setWebinars] = useState(() => loadWebinars());
+
+  useEffect(() => {
+    function onUpdate() { setWebinars(loadWebinars()); }
+    window.addEventListener('webinarsUpdated', onUpdate);
+    return () => window.removeEventListener('webinarsUpdated', onUpdate);
+  }, []);
 
   const filteredWebinars = webinars
     .filter((w) => (tag ? w.tag === tag : true))
@@ -57,7 +75,7 @@ export default function Webinars() {
     setModal(
       <Modal onClose={() => setModal(null)}>
         <h2>Register for "{w.title}"</h2>
-        <RegisterForm />
+        <RegisterForm webinarId={id} />
       </Modal>
     );
   }

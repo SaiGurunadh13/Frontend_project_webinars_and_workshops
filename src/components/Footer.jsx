@@ -1,7 +1,13 @@
 import React from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 
 export default function Footer() {
+  const location = useLocation();
+  // Hide footer on login/signup pages
+  if (location && (location.pathname === "/login" || location.pathname === "/signup")) {
+    return null;
+  }
+
   return (
     <footer>
       <div className="container" style={{
@@ -11,7 +17,6 @@ export default function Footer() {
         gap: 12,
         flexWrap: "wrap"
       }}>
-        <div>© {new Date().getFullYear()} SSS</div>
         <div style={{ display: "flex", gap: 10 }}>
           <Link className="pill" to="/webinars">Next webinar →</Link>
         </div>

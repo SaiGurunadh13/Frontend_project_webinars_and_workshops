@@ -1,10 +1,47 @@
-import React, { useState } from "react";
-import webinars from "../data/webinars";
+import React, { useEffect, useState } from "react";
+import { loadWebinars } from "../data/store";
 import WebinarCard from "../components/WebinarCard";
 import Modal from "../components/Modal";
+import { addRegistration } from '../data/store';
+
+function RegisterFormInline({ webinarId, onDone }) {
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [msg, setMsg] = useState('');
+
+  function submit(e) {
+    e.preventDefault();
+    const currentUser = localStorage.getItem('currentUser') || name;
+    (async () => {
+      const reg = await addRegistration({ webinarId, username: currentUser, name, email });
+      if (reg) {
+      setMsg('Thanks for registering!');
+      setTimeout(() => onDone && onDone(), 800);
+      } else {
+        setMsg('Failed to register');
+      }
+    })();
+  }
+
+  return (
+    <form style={{ display: 'grid', gap: 10 }} onSubmit={submit}>
+      <input className="input" name="name" placeholder="Your Name" value={name} onChange={(e)=>setName(e.target.value)} required />
+      <input className="input" name="email" type="email" placeholder="Email" value={email} onChange={(e)=>setEmail(e.target.value)} required />
+      <button className="btn primary" type="submit">Submit</button>
+      {msg && <div className="muted">{msg}</div>}
+    </form>
+  );
+}
 
 export default function Workshops() {
   const [modal, setModal] = useState(null);
+  const [webinars, setWebinars] = useState(() => loadWebinars());
+
+  useEffect(() => {
+    function onUpdate() { setWebinars(loadWebinars()); }
+    window.addEventListener('webinarsUpdated', onUpdate);
+    return () => window.removeEventListener('webinarsUpdated', onUpdate);
+  }, []);
 
   // Prefer tag matches for workshops/web, but ensure at least 4 items by supplementing with upcoming webinars
   const tagMatches = webinars.filter(
@@ -45,11 +82,7 @@ export default function Workshops() {
     setModal(
       <Modal onClose={() => setModal(null)}>
         <h2>Register for "{w.title}"</h2>
-        <form style={{ display: "grid", gap: 10 }} onSubmit={(e) => { e.preventDefault(); alert('Thanks for registering!'); setModal(null); }}>
-          <input className="input" name="name" placeholder="Your Name" required />
-          <input className="input" name="email" type="email" placeholder="Email" required />
-          <button className="btn primary" type="submit">Submit</button>
-        </form>
+        <RegisterFormInline webinarId={id} onDone={() => setModal(null)} />
       </Modal>
     );
   }
