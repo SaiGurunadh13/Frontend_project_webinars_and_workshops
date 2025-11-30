@@ -24,14 +24,14 @@ export default function Signup() {
       const res = await verifyCaptcha(captcha.id, captchaInput);
       if (!res || !res.ok) {
         setError('Captcha answer is incorrect. Please try again.');
-        // refresh
+        
         const next = await getCaptcha();
         setCaptcha(next);
         setCaptchaInput('');
         return;
       }
 
-      // proceed with signup
+      
       const raw = localStorage.getItem('users');
       const users = raw ? JSON.parse(raw) : [];
       if (users.find((u) => u.username === user)) {
@@ -40,7 +40,7 @@ export default function Signup() {
       }
       users.push({ username: user, password: pass });
       localStorage.setItem('users', JSON.stringify(users));
-      // set role and navigate as student
+      
       localStorage.setItem('role', 'student');
       localStorage.setItem('currentUser', user);
       window.dispatchEvent(new Event('roleChanged'));
