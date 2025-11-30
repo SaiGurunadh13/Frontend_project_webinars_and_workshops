@@ -151,7 +151,11 @@ export default function Login() {
         <input className="input" placeholder="Username" value={username} onChange={(e) => setUsername(e.target.value)} />
         <input className="input" placeholder="New password" type="password" value={newPass} onChange={(e) => setNewPass(e.target.value)} />
         <div className="captcha-row">
-          <div className="muted">{captcha ? `Solve: ${captcha.question}` : 'Loading captcha...'}</div>
+          {captcha ? (
+            <img className="captcha-image" src={captcha.image} alt="captcha" />
+          ) : (
+            <div className="muted">Loading captcha...</div>
+          )}
           <input className="input" value={captchaInput} onChange={(e) => setCaptchaInput(e.target.value)} placeholder="Answer" />
           <button type="button" className="btn" onClick={async () => { const c = await getCaptcha(); setCaptcha(c); setCaptchaInput(''); }}>New</button>
         </div>
